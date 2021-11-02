@@ -1,9 +1,9 @@
+import time
 import socket
 from datetime import datetime
 
-from .app.vehicle_classification import VehicleClassification
-
 from .utils.tracker import EuclideanDistTracker
+from .app.vehicle_classification_v2 import VehicleClassification
 
 from config.config import (
 	MIN_CONFIDENCE,
@@ -39,28 +39,40 @@ class TriggerVehicle:
 				bbox(list): bbox object [x_min, y_min, x_max, y_max]
 			)
 		'''
-		result_classification 	= self.classification.detection(image, image_size=640)
-		results_vehicle_list 	= self.classification.filter_and_crop(
-			results=result_classification, min_confidence=MIN_CONFIDENCE+0.2
-		)
+		try:
+			result_classification 	= self.classification.detection(image)
+			results_vehicle_list 	= self.classification.filter_and_crop(
+				results=result_classification, min_confidence=MIN_CONFIDENCE
+			)
+		except: results_vehicle_list = list()
 		return results_vehicle_list
+
+	def __send_udp_trigger_vehicle(self):
+		pass
 
 	def tigger_vehicle(self, image):
 		# Vehicle detection and classification
-		try: vehicle_classification_list	= self.__classification_vehicle(image)
-		except: vehicle_classification_list = list()
+		vehicle_classification_list	= self.__classification_vehicle(image)
 		
 		# Object tracking
 		if vehicle_classification_list:
 			boxes_ids = self.tracker.update(vehicle_classification_list)
 			for i in boxes_ids:
 				x_min, y_min, x_max, y_max, classes, conf, id = i
-				'''
-				CONDITION TRACKER
-				'''
-				print(id)
+				if self._conditions_tigger(x_min, y_min, x_max, y_max):
+					if not id in self.unique_id:
+						timestamp_now = int(time.time())
+						if (timestamp_now-self.current_timestamp) >= TOLERANT_TIME:
+							self.current_timestamp = timestamp_now
+							# Send trigger to jetson 2
+							print(self.count, i)
+							self.__send_udp_trigger_vehicle()
+							self.count+=1
+							if len(self.unique_id) > 10: self.unique_id = list()
+						else: self.current_timestamp = self.current_timestamp
+
 		# Reset value tracker_id
-		if self.tracker.id_count > 1000: self.tracker.id_count = int()
+		if self.tracker.id_count > 40: self.tracker.id_count = int()
 		return vehicle_classification_list
 		
 	def _conditions_tigger(self, x_min, y_min, x_max, y_max):
@@ -72,34 +84,8 @@ class TriggerVehicle:
 			return False
 
 		elif self.position_restarea == '207':
-			return x_max in range(A[0], B[0]) and \
-				(y_max in range(B[1],B[1]+40) or y_max in range(A[1],A[1]+40))
-
+			return y_max in range(180, 199)
+				
 		elif self.position_restarea == '379':
-			# return y_max in range(A[1], HEIGH) and \
-			# 	(x_min in range(A[0]-170,A[0]+40) or x_min in range(B[0]-300,B[0]))
-
 			return x_min in range(A[0], HEIGH) and \
 				(y_max in range(A[1],A[1]+80) or y_max in range(B[1],B[1]+80))
-
-	def _conditions_blitz(self, x_min, y_min, x_max, y_max):
-		# Condition lamp blitz in night
-		hour_now = datetime.now().hour
-		if not hour_now in range(17, 25) and not hour_now in range(1, 6): return False
-
-		if self.position_restarea == '88a':
-			return x_min in range(A[0], B[0]) and \
-				(y_max in range(A[1], A[1]+130) or y_max in range(B[1], B[1]+130))
-
-		elif self.position_restarea == '88b':
-			return False
-
-		elif self.position_restarea == '207':
-			return x_max in range(A[0], B[0]) and \
-				(y_max in range(B[1]-30,B[1]) or y_max in range(A[1]-30,A[1]))
-
-		elif self.position_restarea == '379':
-			# return y_max in range(A[1], HEIGH) and \
-			# 	(x_min in range(A[0]-200,A[0]+40) or x_min in range(B[0]-300,B[0]))
-			return x_min in range(A[0], HEIGH) and \
-				(y_max in range(A[1]-70,A[1]) or y_max in range(B[1]-70,B[1]))
