@@ -7,13 +7,10 @@ from .app.vehicle_classification_v2 import VehicleClassification
 
 from config.config import (
 	MIN_CONFIDENCE,
-	API_BLITZ,
 	POSITION_CAM,
 	TOLERANT_TIME,
-	A, B,
-	WIDTH, HEIGH,
-	UDP, IP_BLITZ,
-	PORT_BLITZ, MESSAGE
+	A, B, HEIGH,
+	IP_JETSON, PORT_JETSON
 )
 
 
@@ -47,8 +44,14 @@ class TriggerVehicle:
 		except: results_vehicle_list = list()
 		return results_vehicle_list
 
-	def __send_udp_trigger_vehicle(self):
-		pass
+	def __send_udp_trigger_vehicle(self, message_str_send):
+		try:
+			self.sock.sendto(str.encode(message_str_send), (IP_JETSON, PORT_JETSON))
+			self.sock.settimeout(0.2)
+			message = self.sock.recvfrom(1024)
+			self.sock.settimeout(0.2)
+			print(message[0])
+		except: pass
 
 	def tigger_vehicle(self, image):
 		# Vehicle detection and classification
@@ -64,10 +67,7 @@ class TriggerVehicle:
 						timestamp_now = int(time.time())
 						if (timestamp_now-self.current_timestamp) >= TOLERANT_TIME:
 							self.current_timestamp = timestamp_now
-							# Send trigger to jetson 2
-							print(self.count, i)
-							self.__send_udp_trigger_vehicle()
-							self.count+=1
+							self.__send_udp_trigger_vehicle(f'{classes} {round(conf, 2)}')
 							if len(self.unique_id) > 10: self.unique_id = list()
 						else: self.current_timestamp = self.current_timestamp
 
