@@ -141,6 +141,10 @@ IP_BLITZ 	= '192.168.8.65'
 PORT_BLITZ 	= 4210
 MESSAGE 	= b'blitz 20'
 
+#========================= UDP JETSON B =================================
+IP_JETSON 	= '192.168.8.68'
+PORT_JETSON = 4209
+
 COMMAND_FFMPEG = [
 	'ffmpeg',
 	'-y',
