@@ -37,7 +37,6 @@ class RunAplication:
 				key = cv2.waitKey(30)
 				if key == 27:
 					break
-
 		self.cap.release()
 		cv2.destroyAllWindows()
 
